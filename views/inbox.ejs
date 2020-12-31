@@ -1,0 +1,331 @@
+<%- include ("includes/header") %>
+
+
+<section >
+	<div class="gap gray-bg">
+		<div class="container-fluid">
+			<div class="row">
+				<div class="col-md-12">
+					<div class="row" id="page-contents">
+
+						<div class="col-md-3">
+							<%- include ("includes/left-sidebar") %>
+						</div>
+
+						<div class="col-md-6">
+							<div class="central-meta">
+							<div class="messages">
+								<h5 class="f-title">
+									<i class="ti-bell"></i>
+									All messages
+									<span class="more-options">
+										<i class="fa fa-ellipsis-h"></i>
+									</span>
+								</h5>
+
+								<div class="message-box">
+									<ul class="peoples" id="friends"></ul>
+									<div class="peoples-mesg-box">
+
+										<div class="conversation-head" id="conversation-head"></div>
+										<ul class="chatting-area" id="chatting-area"></ul>
+										<div id="chat" class="message-text-container">
+
+											<form method="POST" onsubmit="return dosendMessage(this);" >
+												<textarea id="mess" class="form-control emojionearea-editor" name="message"></textarea>
+												<i class="fa fa-camera-retro"></i>
+												
+													<input type="file" accept="uploads/*" name="image" onchange="previewPostImage(this)" />
+
+													<img class="profile-image" id="post-img-preview" style=" object-fit: cover;display: none;">
+													
+												<button title="send">
+												
+
+													<i class="fa fa-paper-plane"></i>
+												</button>
+											</form>
+										</div>
+									</div>
+								</div>
+								
+							</div>
+							</div>
+						</div>
+
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+
+<script>
+	 var socket = io("http://localhost:3000");  
+	var isFriends = true;
+	var selectedFriend = null;
+	var friends = [];
+	let emojioneAreas = $("#mess").emojioneArea({
+        search: false
+		});
+	var time = Date.now();
+	
+	function showFriends(){
+
+		var html = '';
+		friends = window.user.friends;
+	
+		for(var a = 0; a < window.user.friends.length; a++){
+			var data = window.user.friends[a];
+			
+			if(data.status == 'Pending'){
+				continue;
+			}
+			html += '<li data-id="' + data._id + '" onclick="friendSelected(this);">'
+				html += '<figure>';
+					html += '<img class="rounded-circle" src="' + mainURL + '/' + data.profileImage + '">';
+				html += '</figure>';
+				html += '<div class="people-name" >';
+					html += '<span>' + data.name + '</span>';
+				html += '</div>';
+				
+				html += '<div id="img_cont" class="img_cont">'		
+				
+				html += '</div>';
+
+			html += '</li>';	
+		}
+		document.getElementById('friends').innerHTML = html;
+		
+		connectSocket();
+		checkLogin();
+
+	}
+
+	socket.on('sendSocketID',function(data){
+		var socketID = data.socketID;
+		
+		socket.emit('sendUserOnline', socketID)
+	})
+
+	socket.on('sendUserOnline', function(data){
+	
+		if(data){
+			var html =''
+			html +=	'<span class="online_icon"></span>';
+			document.getElementById('img_cont').innerHTML = html;
+					}
+				})
+
+	socket.on('logout',function(){
+		var html = ''
+		html +=	'<span class="online_icon"></span>';
+		document.getElementById('img_cont').style.display = 'none';
+	});
+
+	function checkLogin( ){
+		var html = '';
+		var ajax = new XMLHttpRequest();
+		ajax.open('POST','/checkUserOnline', true);
+		ajax.onreadystatechange = function(){
+			if (this.readyState == 4 && this.status == 200) {
+				var response = JSON.parse(this.responseText);
+				
+			}
+		};
+		var formData = new FormData();
+		formData.append('accessToken',localStorage.getItem('accessToken'));
+		ajax.send(formData);
+	}
+
+	function friendSelected(self){
+
+		var _id = self.getAttribute('data-id');
+	
+		var index = friends.findIndex(function(friend){
+			return friend._id == _id;
+		});
+		selectedFriend = friends[index];
+
+		var html = "" ;
+		html += '<figure>';
+			html += '<img src="' + mainURL + '/' + selectedFriend.profileImage + '">';
+
+		html += '</figure>';
+		html += '<span>' + selectedFriend.name + '</span>';
+		document.getElementById('conversation-head').innerHTML = html;
+
+		var ajax = new XMLHttpRequest();
+		ajax.open('POST','/getFriendsChat', true);
+		
+		ajax.onreadystatechange = function(){
+			if (this.readyState == 4 && this.status == 200) {
+					var response = JSON.parse(this.responseText);
+					
+					var html = '';
+					for(var a = 0; a < response.data.length; a++){
+						var inbox = response.data[a];
+						
+						if(inbox.from == window.user._id){
+							html += '<li class="me">';
+								html += '<span>' +  moment(inbox.create_at).format('MM/DD/YYYY h:mm ') + '</span>';							
+									if(inbox.image){
+										html += '<img src="' + mainURL + '/' + inbox.image + '">';
+
+									}
+									if(inbox.message){
+										html += '<p style="word-break: break-all;">' + inbox.message + '</p>';
+
+									}
+
+
+							html += '</li>';
+						}else{
+							html += '<li class="you">';
+								html += '<span>' +  moment(inbox.create_at).format('MM/DD/YYYY h:mm ') + '</span>';
+								if(inbox.image ){
+									html += '<img src="' + mainURL + '/' + inbox.image + '">';
+								}
+								if(inbox.message ){
+									html += '<p style="word-break: break-all;">' + inbox.message + '</p>';
+								}
+
+							html += '</li>';
+						}					
+						}
+						document.getElementById("chatting-area").innerHTML = html;
+						var objDiv = document.getElementById("chatting-area");
+						objDiv.scrollTop = objDiv.scrollHeight;
+			}
+		}
+		var formData = new FormData();
+		formData.append("accessToken", localStorage.getItem("accessToken"));
+			 
+		formData.append("_id", _id);
+		ajax.send(formData);
+	}
+
+	function dosendMessage(form){
+		if(selectedFriend == null){
+			return false;
+		}
+		var message = form.message.value;
+		var image = form.image.value;
+		
+			
+		var ajax = new XMLHttpRequest();
+		ajax.open('POST','/sendMessage', true);
+		ajax.onreadystatechange = function(){
+			if (this.readyState == 4 && this.status == 200) {
+				var response = JSON.parse(this.responseText);
+				
+				if(response.status == 'success'){
+					var html = '';
+					 html += '<li class="me">';
+						html += '<span>' +  moment(time).format('MM/DD/YYYY h:mm ') + '</span>';
+						
+						if(image != ''){
+							html += '<img src="' + 'public/inboximage'  + '/' + image.slice(12) + '">'   ;
+
+						}				
+							if(message != ''){
+							html += '<p style="word-break: break-all;">' + message + '</p>';
+
+						}
+				
+					html += '</li>';
+				
+					document.getElementById('chatting-area').innerHTML += html;
+					form.message.value = '';
+					form.image.value = '';
+					document.getElementById("post-img-preview").style.display = "none";
+					emojioneAreas.data("emojioneArea").setText('');
+					var objDiv = document.getElementById('chatting-area');
+					objDiv.scrollTop = objDiv.scrollHeight;
+				}
+			}
+		};
+		
+	
+		var formData = new FormData(form);
+		formData.append('accessToken',localStorage.getItem('accessToken'));
+
+		formData.append('_id', selectedFriend._id);
+		
+		formData.append('message', message);
+		formData.append('image', image);
+		ajax.send(formData);
+		return false;
+	
+	}
+	
+	function previewPostImage(self) {
+			var file = self.files;
+			if (file.length > 0) {
+				var fileReader = new FileReader();
+
+				fileReader.onload = function (event) {
+				
+				document.getElementById("post-img-preview").style.display = "";
+					document.getElementById("post-img-preview").setAttribute("src", event.target.result);
+				
+				};
+			
+
+				fileReader.readAsDataURL(file[0]);
+				
+			}
+		}
+
+	function connectSocket(){
+		var ajax = new XMLHttpRequest();
+		ajax.open('POST','/connectSocket', true);
+		ajax.onreadystatechange = function(){
+			if (this.readyState == 4 && this.status == 200) {
+				var response = JSON.parse(this.responseText);
+			
+				socket.on('messageReceived',function(messageObj){
+					console.log(messageObj)
+					if(selectedFriend != null && messageObj.from == selectedFriend._id){
+						var html = '';
+						html = '<li class="you">';
+					
+						if(messageObj.message ){
+							html += '<span>' +  moment(messageObj.create_at).format('MM/DD/YYYY h:mm ') + '</span>';
+							html += '<p>' + messageObj.message + '</p>';
+						}
+						if(messageObj.image ){
+							html += '<span>' +  moment(messageObj.create_at).format('MM/DD/YYYY h:mm ') + '</span>';
+							html += '<img src="' + mainURL + '/' + messageObj.image + '">';
+						}
+						html += '</li>';
+						document.getElementById('chatting-area').innerHTML += html;
+						var objDiv = document.getElementById('chatting-area');
+						objDiv.scrollTop = objDiv.scrollHeight;
+
+					}
+				});
+			}
+		};
+		var formData = new FormData();
+		formData.append('accessToken',localStorage.getItem('accessToken'));
+		ajax.send(formData);
+	
+	};
+
+
+	document.getElementById("chat").addEventListener("focusin", function(){
+   		socket.emit("keyboar");
+   
+	});
+	document.getElementById("chat").addEventListener("focusout", function(){
+    	socket.emit("un-keyboar");
+	});
+
+	socket.on("thong-bao",function(data){
+		console.log('ád')
+  		// let span = document.getElementById("thong-bao");
+  		// span.innerHTML=  data;
+}); 
+</script>
+<%- include ("includes/footer") %>

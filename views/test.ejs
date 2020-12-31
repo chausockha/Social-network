@@ -1,0 +1,35 @@
+<%- include ("includes/header") %>
+
+<section>
+	<div class="gap gray-bg">
+		<div class="container-fluid">
+			<div class="row">
+				<div class="col-md-12">
+					<div class="row" id="page-contents">
+
+						<div class="col-md-3">
+							<%- include ("includes/left-sidebar") %>
+						</div>
+
+						<div class="col-md-6">
+							<form method="POST"  action='/posttest'  enctype="multipart/form-data" >
+								<input type="hidden" name="_csrf" value="<%=csrfToken%>">
+								<input type="file" name="photo"> 
+								<input type="submit" value="Upload photo"> 
+							</form>
+							<div id="add-post-box"></div>
+
+							<div class="loadMore" id="newsfeed">
+
+							</div>
+						</div>
+
+						<div class="col-md-3">
+							<%- include ("includes/right-sidebar") %>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>

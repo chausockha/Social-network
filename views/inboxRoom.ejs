@@ -1,0 +1,427 @@
+<%- include ("includes/header") %>
+<section>
+	<div class="gap gray-bg">
+		
+		<div class="container-fluid">
+
+			
+			<div class="row">
+				
+				<div class="offset-md-3 col-md-6">
+					<div class="timeline-info">
+						
+						<ul class="nav nav-tabs">
+							<li>
+								<a class="active" data-toggle="tab" href="#people">Groups</a>
+								
+								<a data-toggle="tab" href="#groups">Members</a>
+							</li>
+						</ul>
+					</div>
+				</div>
+			</div>
+
+			<div class="row">
+				<div class="col-md-12">
+					<div class="row" id="page-contents">
+
+						<div class="col-md-3" style="margin-top: -60px">
+								<%- include ("includes/left-sidebar") %>
+						</div>
+					
+						<div class="col-md-6">
+							<div class="central-meta">
+								<div class="frnds">
+
+									<div class="tab-content">
+										<div class="tab-pane active fade show" id="people">
+											<div class="message-box">
+												<ul class="peoples" id="all-groups"></ul>
+												<div class="peoples-mesg-box">
+			
+													<div class="conversation-head" id="conversation-head"></div>
+													<ul class="chatting-area" id="chatting-area"></ul>
+													<div class="message-text-container">
+														<form method="POST" onsubmit="return sendMessageRoom(this);">
+															<textarea id="mess"  class="form-control emojionearea-editor" name="message"></textarea>
+													<input type="file" accept="uploads/*" name="image" onchange="previewPostImage(this)" />
+													<img class="profile-image" id="post-img-preview" style=" object-fit: cover;display: none;">
+														
+															<button title="send">
+																<i class="fa fa-paper-plane"></i>
+															</button>
+														</form>
+													</div>
+												</div>
+											</div>
+											<ul class="nearby-contct" id="search-results"></ul>
+											
+										</div>
+
+										<div class="tab-pane active fade" id="groups">
+												<div class="message-box">
+												<ul class="peoples" id="all-groups1"></ul>
+												<div class="peoples-mesg-box">
+			
+													<div class="conversation-head" id="conversation-head1"></div>
+													<ul class="chatting-area" id="chatting-area1"></ul>
+													<div class="message-text-container">
+													
+													</div>
+												</div>
+											</div>
+											<ul class="nearby-contct" id="search-result-groups"></ul>
+
+										</div>
+									
+									</div>
+								</div>
+							</div>
+						</div>
+
+						
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</section>
+<script>
+	 var socket = io("http://localhost:3000");  
+    	var isGroups = true;
+        var room = [];
+        var selectedRoom = null;
+		var idroom = '';
+	
+
+		let emojioneAreas = $("#mess").emojioneArea({
+        search: false
+    	});
+		
+    function getGroups(){
+    
+    var ajax = new XMLHttpRequest();
+    ajax.open('POST','/getGroups', true);
+    ajax.onreadystatechange = function() {
+        if(this.readyState == 4 && this.status == 200){
+           
+            var response = JSON.parse(this.responseText);
+            if(response.status == 'error'){
+                  alert(response.message);
+                return ;
+            }
+           
+		room = response.data;
+		
+		
+        var html = '';
+        for(var a = 0; a < response.data.length ; a++){
+            var data = response.data[a];
+			
+			
+            var isMember = false;
+                    for(var b=0 ; b < window.user.groups.length; b++){
+						var tempData = window.user.groups[b];
+						//console.log(tempData._id)
+                        if(tempData._id.toString() == data._id.toString()){
+                            isMember = true;
+                            break;
+                        }
+                    }	
+	
+			if(isMember){
+				
+				html += '<li data-id="' + data._id + '" onclick="roomSelected(this);">'
+				html += '<figure>';
+					html += '<img src="' + mainURL + '/' + data.coverPhoto + '">';
+				html += '</figure>';
+				html += '<div class="people-name" >';
+                    html += '<span>' + data.name + '</span>';
+                    html += '<em id="member" style="padding-left: 5px;">' +data.members.length + ' Members</em>';
+				html += '</div>';
+				html += '</li>';
+
+			}
+				
+        }
+		document.getElementById('all-groups').innerHTML = html ;
+		document.getElementById('all-groups1').innerHTML = html ;
+		
+    }
+        
+    }
+    var formData = new FormData();
+    formData.append('accessToken', localStorage.getItem('accessToken'));
+    ajax.send(formData);
+	
+	
+};
+
+function roomSelected(self){
+		var _id = self.getAttribute('data-id');
+      
+		var index = room.findIndex(function(r){
+			return r._id == _id;
+		});
+		
+		selectedRoom = room[index];
+		var mess = document.getElementById('mess');
+		
+		
+		var html = "" ;
+		html += '<figure>';
+			html += '<img src="' + mainURL + '/' + selectedRoom.coverPhoto + '">';
+		html += '</figure>';
+        html += '<span>' + selectedRoom.name + '</span>';
+        
+		document.getElementById('conversation-head').innerHTML = html;
+		document.getElementById('conversation-head1').innerHTML = html;
+		var ajax = new XMLHttpRequest();
+		ajax.open('POST','/getRoomsChat', true);
+	
+		ajax.onreadystatechange = function(){
+			if (this.readyState == 4 && this.status == 200) {
+					var response = JSON.parse(this.responseText);
+					var html = '';
+			
+					for(var a = 0; a < response.data.length; a++){
+						var inbox = response.data[a];
+					
+						if(inbox.iduser == window.user._id){
+						
+							html += '<li class="me">';
+								
+								if(inbox.image){
+									html += '<span>' +  moment(inbox.create_at).format('MM/DD/YYYY h:mm ') + '</span>';
+										html += '<img src="'  + inbox.image + '">'   ;
+								}
+								if(inbox.message){
+									html += '<span>' +  moment(inbox.create_at).format('MM/DD/YYYY h:mm ') + '</span>';
+									html +='<span>' +  inbox.userName + '</span>' + '<p style="word-break: break-word;"> '  + inbox.message + '</p>';
+
+								}
+
+							html += '</li>';
+						}else{
+							html += '<li class="you">';
+								if(inbox.image){
+									html += '<span>' +  moment(inbox.create_at).format('MM/DD/YYYY h:mm ') + '</span>';
+										html += '<img src="'  + inbox.image + '">'   ;
+								}
+								if(inbox.message){
+									html += '<span>' +  moment(inbox.create_at).format('MM/DD/YYYY h:mm ') + '</span>';
+									html +='<span>' +  inbox.userName + '</span>' + '<p style="word-break: break-word;"> '  + inbox.message + '</p>';
+
+								}
+							html += '</li>';
+						}					
+						}
+					//get members 
+					var html1 = '';
+					var boss = response.room.user._id;
+					var members = response.room.members	;
+						members.forEach(m => {
+							html1 += '<li>';
+							html1 += '<div class="nearly-pepls">';
+								html1 += '<figure>';
+									html1 += '<a style="position: absolute; margin-left: 80px;margin-top:10px " href="/user/' + m.name + '">' + m.name + '</a>';
+								
+										html1 += '<img class="rounded-circle" src="' + mainURL + '/' + m.profileImage + '">';
+									
+									html1 += '</a>';
+								html1 += '</figure>';
+
+								html1 += '<div class="pepl-info">';
+									if(boss == m._id ){
+										html1 += '<a style="margin-top: -50px; position: initial;"  onclick="" class="add-butn more-action">Boss </a>';
+									}else{
+										html1 += '<a style="margin-top: -50px; position: initial;" href="javascript:void(0);" data-id="' + m._id + '" onclick="kickMember(this);" class="add-butn more-action">Kick </a>';
+
+									}
+								html1 += '</div>';
+							html1 += '</div>';
+						html1 += '</li>';
+						})
+					
+
+						document.getElementById("chatting-area").innerHTML = html;
+						document.getElementById("chatting-area1").innerHTML = html1;
+						var objDiv = document.getElementById("chatting-area");
+						objDiv.scrollTop = objDiv.scrollHeight;
+			}
+		}
+		var formData = new FormData();
+		formData.append("accessToken", localStorage.getItem("accessToken"));
+			 
+		formData.append("_id", _id);
+		ajax.send(formData);
+		socket.emit('send-id-room',selectedRoom._id );
+		//connectSocket();
+    }
+    
+
+function sendMessageRoom(form){
+		
+		var message = form.message.value;
+		var image = form.image.value;
+		
+		var ajax = new XMLHttpRequest();
+		ajax.open('POST','/sendMessRoom', true);
+		ajax.onreadystatechange = function(){
+			if (this.readyState == 4 && this.status == 200) {
+				var response = JSON.parse(this.responseText);
+				var time = Date.now();
+				if(response.status == 'success'){
+					// var html = '';
+					//  html += '<li class="me">';
+					// 	html += '<span>' +  moment(time).format('MM/DD/YYYY h:mm ') + '</span>';
+					// 	html +='<span>' +  window.user.name+ '</span>' + '<p style="word-break: break-word;"> '  + message + '</p>';
+						
+					// html += '</li>';
+
+					//document.getElementById('chatting-area').innerHTML += html;
+					
+					form.message.value = '';
+					form.image.value = '';
+					document.getElementById("post-img-preview").style.display = "none";
+					emojioneAreas.data("emojioneArea").setText('');
+					var objDiv = document.getElementById('chatting-area');
+					objDiv.scrollTop = objDiv.scrollHeight;
+				}
+			}
+		};
+		var formData = new FormData(form);
+		formData.append('accessToken',localStorage.getItem('accessToken'));
+		formData.append('_id', selectedRoom._id);
+		ajax.send(formData);
+		return false;
+
+	}
+
+
+	// function connectSocket(){
+	// 	var ajax = new XMLHttpRequest();
+	// 	ajax.open('POST','/connectSocketRoom', true);
+	// 	ajax.onreadystatechange = function(){
+	// 		if (this.readyState == 4 && this.status == 200) {
+	// 			var response = JSON.parse(this.responseText);			
+	// 		}
+	// 	};
+	// 	var formData = new FormData();
+		
+	// 	formData.append('accessToken',localStorage.getItem('accessToken'));
+	// 	formData.append('_id', selectedRoom._id);
+	// 	ajax.send(formData);
+	
+	// };
+	socket.on('messageReceivedRoom',function(messageObj){
+			
+					if(selectedRoom != null && messageObj.from == selectedRoom._id){
+
+						var html = 	'';
+					if(messageObj.fromuser == window.user._id){
+						
+						html += '<li class="me">';
+							 if(messageObj.image){
+							html += '<span>' +  moment(messageObj.create_at).format('MM/DD/YYYY h:mm ') + '</span>';
+							 html += '<img src="'  + messageObj.image + '">'   ;
+							 }
+							if(messageObj.message){
+							html += '<span>' +  moment(messageObj.create_at).format('MM/DD/YYYY h:mm ') + '</span>';
+								html +='<span>' +  window.user.name + '</span>' + '<p style="word-break: break-word;"> '  + messageObj.message + '</p>';
+							}
+						html += '</li>';
+					}else{
+						html += '<li class="you">';
+							if(messageObj.image){
+							html += '<span>' +  moment(messageObj.create_at).format('MM/DD/YYYY h:mm ') + '</span>';
+							 html += '<img src="'  + messageObj.image + '">'   ;
+							 }
+							if(messageObj.message){
+							html += '<span>' +  moment(messageObj.create_at).format('MM/DD/YYYY h:mm ') + '</span>';
+								html +='<span>' +  window.user.name + '</span>' + '<p style="word-break: break-word;"> '  + messageObj.message + '</p>';
+							}
+						html += '</li>';
+					}	
+					document.getElementById('chatting-area').innerHTML += html;
+						var objDiv = document.getElementById('chatting-area');
+						objDiv.scrollTop = objDiv.scrollHeight;				
+					}
+				});
+
+	function kickMember(self){
+		var _id = self.getAttribute('data-id');
+
+		var ajax = new XMLHttpRequest();
+		ajax.open('POST','/kickmember',true);
+		ajax.onreadystatechange = function(){
+			if (this.readyState == 4 && this.status == 200) {
+				var response = JSON.parse(this.responseText);
+				if(response.status == 'success'){
+					alert(response.message);
+				}
+			}
+		};
+		var formData = new FormData();
+		formData.append('accessToken',localStorage.getItem('accessToken'));		
+		formData.append('_id',_id);
+		formData.append('roomId', selectedRoom._id);
+	
+		ajax.send(formData);
+		//console.log(formData)
+	}	
+	
+	socket.on('send-new-member', (data) => {
+		let newMember = data.data;
+		let html = '';
+
+		newMember.forEach(e =>{
+			var isMember = false;
+                    for(var b=0 ; b < window.user.groups.length; b++){
+						var tempData = window.user.groups[b];
+						
+                        if(tempData._id.toString() == e._id.toString()){
+                            isMember = true;
+                            break;
+                        }
+					}
+			if(isMember){
+				html += '<li data-id="' + e._id + '" onclick="roomSelected(this);">'
+				html += '<figure>';
+					html += '<img class="rounded-circle" src="' + mainURL + '/' + e.coverPhoto + '">';
+				html += '</figure>';
+				html += '<div class="people-name" >';
+					html += '<span>' + e.name + '</span>';
+					html += '<div id="img_cont" class="img_cont">'		
+				
+					html += '</div>';
+                    html += '<em id="member" style="padding-left: 5px;">' +e.members.length + ' Members</em>';
+				html += '</div>';
+				html += '</li>';
+			}
+			
+		})
+		document.getElementById('all-groups1').innerHTML = html ;		
+		document.getElementById('all-groups').innerHTML = html ;
+
+
+		// function previewPostImage(self) {
+		// 	var file = self.files;
+		// 	if (file.length > 0) {
+		// 		var fileReader = new FileReader();
+
+		// 		fileReader.onload = function (event) {
+				
+		// 		document.getElementById("post-img-preview").style.display = "";
+		// 			document.getElementById("post-img-preview").setAttribute("src", event.target.result);
+				
+		// 		};
+			
+
+		// 		fileReader.readAsDataURL(file[0]);
+				
+		// 	}
+		// }
+	});
+</script>
+<%- include ("includes/footer") %>
